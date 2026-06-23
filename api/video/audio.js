@@ -1,7 +1,14 @@
-const ytdl = require('ytdl-core')
-const { Readable } = require('stream')
+import ytdl from 'ytdl-core'
 
 export default async function handler(req, res) {
+  res.setHeader('Access-Control-Allow-Origin', '*')
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS')
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
+
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end()
+  }
+
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' })
   }
@@ -12,25 +19,34 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'URL is required' })
   }
 
-  if (!ytdl.validateURL(url)) {
-    return res.status(400).json({ error: 'Invalid YouTube URL' })
-  }
-
   try {
+    if (!ytdl.validateURL(url)) {
+      return res.status(400).json({ error: 'Invalid YouTube URL' })
+    }
+
+    const info = await ytdl.getInfo(url)
+    const title = info.videoDetails.title.replace(/[^\w\s-]/gi, '') || 'audio'
+
     const stream = ytdl(url, {
       filter: 'audioonly',
       quality: 'highestaudio',
     })
 
-    const info = await ytdl.getInfo(url)
-    const title = info.videoDetails.title.replace(/[^\w\s-]/gi, '')
-
     res.setHeader('Content-Type', 'audio/mpeg')
     res.setHeader('Content-Disposition', `attachment; filename="${title}.mp3"`)
 
     stream.pipe(res)
+
+    stream.on('error', (err) => {
+      console.error('Stream error:', err.message)
+      if (!res.headersSent) {
+        res.status(500).json({ error: 'Download failed' })
+      }
+    })
   } catch (error) {
-    console.error('Error downloading audio:', error)
-    return res.status(500).json({ error: 'Download failed. Video may be private or unavailable.' })
+    console.error('Error downloading audio:', error.message)
+    if (!res.headersSent) {
+      return res.status(500).json({ error: 'Download failed. Please try again.' })
+    }
   }
 }

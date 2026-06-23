@@ -1,6 +1,14 @@
-const ytdl = require('ytdl-core')
+import ytdl from 'ytdl-core'
 
 export default async function handler(req, res) {
+  res.setHeader('Access-Control-Allow-Origin', '*')
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS')
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
+
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end()
+  }
+
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' })
   }
@@ -11,34 +19,36 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'URL is required' })
   }
 
-  if (!ytdl.validateURL(url)) {
-    return res.status(400).json({ error: 'Invalid YouTube URL' })
-  }
-
   try {
-    const qualityMap = {
-      '720': '720',
-      '1080': '1080',
-      '1440': '1440',
-      '2160': '2160',
+    if (!ytdl.validateURL(url)) {
+      return res.status(400).json({ error: 'Invalid YouTube URL' })
     }
 
-    const targetQuality = qualityMap[quality] || '720'
-
-    const stream = ytdl(url, {
-      quality: targetQuality,
-      filter: 'videoandaudio',
-    })
-
     const info = await ytdl.getInfo(url)
-    const title = info.videoDetails.title.replace(/[^\w\s-]/gi, '')
+    const title = info.videoDetails.title.replace(/[^\w\s-]/gi, '') || 'video'
+
+    let formatOptions = {
+      quality: quality || '1080',
+      filter: 'videoandaudio',
+    }
+
+    const stream = ytdl(url, formatOptions)
 
     res.setHeader('Content-Type', 'video/mp4')
     res.setHeader('Content-Disposition', `attachment; filename="${title}.mp4"`)
 
     stream.pipe(res)
+
+    stream.on('error', (err) => {
+      console.error('Stream error:', err.message)
+      if (!res.headersSent) {
+        res.status(500).json({ error: 'Download failed' })
+      }
+    })
   } catch (error) {
-    console.error('Error downloading video:', error)
-    return res.status(500).json({ error: 'Download failed. Video may be private or unavailable.' })
+    console.error('Error downloading video:', error.message)
+    if (!res.headersSent) {
+      return res.status(500).json({ error: 'Download failed. Please try again.' })
+    }
   }
 }

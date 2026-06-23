@@ -1,6 +1,14 @@
-const ytdl = require('ytdl-core')
+import ytdl from 'ytdl-core'
 
 export default async function handler(req, res) {
+  res.setHeader('Access-Control-Allow-Origin', '*')
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS')
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type')
+
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end()
+  }
+
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' })
   }
@@ -11,26 +19,19 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'URL is required' })
   }
 
-  if (!ytdl.validateURL(url)) {
-    return res.status(400).json({ error: 'Invalid YouTube URL' })
-  }
-
   try {
-    const info = await ytdl.getInfo(url)
-    const formats = info.formats
-      .filter(f => f.hasVideo && f.hasAudio)
-      .map(f => ({
-        quality: f.qualityLabel,
-        url: f.url,
-        size: f.contentLength ? `${(parseInt(f.contentLength) / (1024 * 1024)).toFixed(1)} MB` : 'Unknown',
-      }))
+    if (!ytdl.validateURL(url)) {
+      return res.status(400).json({ error: 'Invalid YouTube URL' })
+    }
 
+    const info = await ytdl.getInfo(url)
     const videoDetails = info.videoDetails
 
     return res.status(200).json({
       title: videoDetails.title,
-      thumbnail: videoDetails.thumbnails.pop()?.url || `https://img.youtube.com/vi/${videoDetails.videoId}/maxresdefault.jpg`,
+      thumbnail: videoDetails.thumbnails?.pop()?.url || `https://img.youtube.com/vi/${videoDetails.videoId}/maxresdefault.jpg`,
       duration: formatDuration(parseInt(videoDetails.lengthSeconds)),
+      videoId: videoDetails.videoId,
       formats: [
         { quality: '720', label: '720p' },
         { quality: '1080', label: '1080p' },
@@ -39,12 +40,18 @@ export default async function handler(req, res) {
       ],
     })
   } catch (error) {
-    console.error('Error fetching video info:', error)
-    return res.status(500).json({ error: 'Failed to fetch video info. Video may be private or unavailable.' })
+    console.error('Error fetching video info:', error.message)
+    const message = error.message?.includes('private')
+      ? 'Video is private or unavailable'
+      : error.message?.includes('region')
+      ? 'Video not available in your region'
+      : 'Failed to fetch video info. Please check the URL and try again.'
+    return res.status(500).json({ error: message })
   }
 }
 
 function formatDuration(seconds) {
+  if (isNaN(seconds)) return '0:00'
   const mins = Math.floor(seconds / 60)
   const secs = seconds % 60
   return `${mins}:${secs.toString().padStart(2, '0')}`
