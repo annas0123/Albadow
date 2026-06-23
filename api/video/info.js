@@ -1,5 +1,3 @@
-import ytdl from 'ytdl-core'
-
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*')
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS')
@@ -20,39 +18,48 @@ export default async function handler(req, res) {
   }
 
   try {
-    if (!ytdl.validateURL(url)) {
+    const videoId = extractVideoId(url)
+
+    if (!videoId) {
       return res.status(400).json({ error: 'Invalid YouTube URL' })
     }
 
-    const info = await ytdl.getInfo(url)
-    const videoDetails = info.videoDetails
+    const oembedUrl = `https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${videoId}&format=json`
+    const response = await fetch(oembedUrl)
+
+    if (!response.ok) {
+      return res.status(404).json({ error: 'Video not found or is private' })
+    }
+
+    const data = await response.json()
 
     return res.status(200).json({
-      title: videoDetails.title,
-      thumbnail: videoDetails.thumbnails?.pop()?.url || `https://img.youtube.com/vi/${videoDetails.videoId}/maxresdefault.jpg`,
-      duration: formatDuration(parseInt(videoDetails.lengthSeconds)),
-      videoId: videoDetails.videoId,
+      title: data.title || 'YouTube Video',
+      author: data.author_name || 'Unknown',
+      thumbnail: `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`,
+      videoId: videoId,
       formats: [
+        { quality: '360', label: '360p' },
+        { quality: '480', label: '480p' },
         { quality: '720', label: '720p' },
         { quality: '1080', label: '1080p' },
-        { quality: '1440', label: '1440p' },
-        { quality: '2160', label: '4K' },
       ],
     })
   } catch (error) {
     console.error('Error fetching video info:', error.message)
-    const message = error.message?.includes('private')
-      ? 'Video is private or unavailable'
-      : error.message?.includes('region')
-      ? 'Video not available in your region'
-      : 'Failed to fetch video info. Please check the URL and try again.'
-    return res.status(500).json({ error: message })
+    return res.status(500).json({ error: 'Failed to fetch video info. Please try again.' })
   }
 }
 
-function formatDuration(seconds) {
-  if (isNaN(seconds)) return '0:00'
-  const mins = Math.floor(seconds / 60)
-  const secs = seconds % 60
-  return `${mins}:${secs.toString().padStart(2, '0')}`
+function extractVideoId(url) {
+  const patterns = [
+    /(?:youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/|youtube\.com\/v\/|youtube\.com\/shorts\/)([a-zA-Z0-9_-]{11})/,
+  ]
+
+  for (const pattern of patterns) {
+    const match = url.match(pattern)
+    if (match) return match[1]
+  }
+
+  return null
 }

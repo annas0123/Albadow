@@ -1,5 +1,3 @@
-import ytdl from 'ytdl-core'
-
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*')
   res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS')
@@ -13,40 +11,8 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' })
   }
 
-  const { url, quality } = req.body
-
-  if (!url) {
-    return res.status(400).json({ error: 'URL is required' })
-  }
-
-  try {
-    if (!ytdl.validateURL(url)) {
-      return res.status(400).json({ error: 'Invalid YouTube URL' })
-    }
-
-    const info = await ytdl.getInfo(url)
-    const title = info.videoDetails.title.replace(/[^\w\s-]/gi, '') || 'audio'
-
-    const stream = ytdl(url, {
-      filter: 'audioonly',
-      quality: 'highestaudio',
-    })
-
-    res.setHeader('Content-Type', 'audio/mpeg')
-    res.setHeader('Content-Disposition', `attachment; filename="${title}.mp3"`)
-
-    stream.pipe(res)
-
-    stream.on('error', (err) => {
-      console.error('Stream error:', err.message)
-      if (!res.headersSent) {
-        res.status(500).json({ error: 'Download failed' })
-      }
-    })
-  } catch (error) {
-    console.error('Error downloading audio:', error.message)
-    if (!res.headersSent) {
-      return res.status(500).json({ error: 'Download failed. Please try again.' })
-    }
-  }
+  return res.status(501).json({ 
+    error: 'Audio download is currently unavailable due to YouTube restrictions. Please use the Thumbnail Downloader instead.',
+    statusCode: 501
+  })
 }
