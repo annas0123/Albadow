@@ -1,0 +1,61 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --color-mercury-blue: #5266eb;
+    --color-ghost-blue: #cdddff;
+    --color-deep-space: #171721;
+    --color-midnight-slate: #1e1e2a;
+    --color-graphite: #272735;
+    --color-lead: #70707d;
+    --color-starlight: #ededf3;
+    --color-silver: #c3c3cc;
+    --color-pure-white: #ffffff;
+  }
+
+  * {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+  }
+
+  body {
+    font-family: 'Inter', sans-serif;
+    background-color: var(--color-deep-space);
+    color: var(--color-starlight);
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  ::selection {
+    background-color: var(--color-mercury-blue);
+    color: var(--color-pure-white);
+  }
+}
+
+@layer components {
+  .btn-pill {
+    @apply px-6 py-3 rounded-pill font-medium transition-all duration-200;
+  }
+
+  .btn-primary {
+    @apply btn-pill bg-mercury-blue text-pure-white hover:bg-ghost-blue hover:text-deep-space;
+  }
+
+  .btn-secondary {
+    @apply btn-pill bg-graphite text-starlight border border-lead hover:border-mercury-blue;
+  }
+
+  .input-pill {
+    @apply w-full px-6 py-3 rounded-pill bg-graphite text-starlight border border-lead 
+           focus:border-mercury-blue focus:outline-none transition-colors duration-200
+           placeholder:text-lead;
+  }
+
+  .card-sharp {
+    @apply bg-graphite p-6;
+  }
+}
