@@ -45,7 +45,7 @@ export const downloadVideo = async (url, quality) => {
     throw new Error(error.error || 'Download failed')
   }
 
-  return response.blob()
+  return response.json()
 }
 
 export const downloadAudio = async (url, quality) => {
@@ -60,7 +60,7 @@ export const downloadAudio = async (url, quality) => {
     throw new Error(error.error || 'Download failed')
   }
 
-  return response.blob()
+  return response.json()
 }
 
 export const fetchThumbnails = async (url) => {

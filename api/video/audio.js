@@ -11,8 +11,60 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' })
   }
 
-  return res.status(501).json({ 
-    error: 'Audio download is currently unavailable due to YouTube restrictions. Please use the Thumbnail Downloader instead.',
-    statusCode: 501
+  const { url, quality } = req.body
+
+  if (!url) {
+    return res.status(400).json({ error: 'URL is required' })
+  }
+
+  const COBALT_INSTANCES = [
+    'https://rue-cobalt.xenon.zone',
+    'https://api.cobalt.blackcat.sweeux.org'
+  ]
+
+  let lastError = null
+  for (const instance of COBALT_INSTANCES) {
+    try {
+      const response = await fetch(instance, {
+        method: 'POST',
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          url,
+          downloadMode: 'audio',
+          audioFormat: 'mp3',
+          audioBitrate: quality || '320' // Bitrate mapping usually works with 320/256/128 etc.
+        })
+      })
+
+      if (!response.ok) {
+        const text = await response.text()
+        throw new Error(`Status ${response.status}: ${text}`)
+      }
+
+      const data = await response.json()
+      if (data.status === 'error') {
+        throw new Error(data.error?.code || data.text || 'API Error')
+      }
+
+      if (data.status === 'tunnel' || data.status === 'redirect') {
+        return res.status(200).json({
+          success: true,
+          url: data.url,
+          filename: data.filename
+        })
+      }
+
+      throw new Error(`Unexpected status: ${data.status}`)
+    } catch (err) {
+      console.warn(`Failed fetching from ${instance}:`, err.message)
+      lastError = err
+    }
+  }
+
+  return res.status(500).json({
+    error: lastError ? `Download failed: ${lastError.message}` : 'Failed to process audio extraction via Cobalt API.'
   })
 }
